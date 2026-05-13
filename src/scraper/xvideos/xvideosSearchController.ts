@@ -1,9 +1,7 @@
 import { load } from "cheerio";
-import LustPress from "../../LustPress";
+import { lust } from "../../LustPress";
 import c from "../../utils/options";
-import { ISearchVideoData } from "../../interfaces";
-
-const lust = new LustPress();
+import { ISearchVideoData, XvideosSearchItem } from "../../interfaces";
 
 export async function scrapeContent(url: string) {
   try {
@@ -11,7 +9,7 @@ export async function scrapeContent(url: string) {
     const $ = load(res);
 
     class XvideosSearch {
-      search: object[];
+      search: XvideosSearchItem[];
       constructor() {
         const data = $("div.thumb-under")
           .map((i, el) => {
@@ -26,34 +24,35 @@ export async function scrapeContent(url: string) {
         this.search = $("div.mozaique.cust-nb-cols")
           .find("div.thumb")
           .map((i, el) => {
+            const href = $(el).find("a").attr("href") || "None";
+            const videoId = $(el).find("img").attr("data-videoid");
             return {
-              link: `${c.XVIDEOS}${$(el).find("a").attr("href")}` || "None",
-              id: $(el).find("a").attr("href") || "None",
+              link: `${c.XVIDEOS}${href}`,
+              id: href,
               image: $(el).find("img").attr("data-src") || "None",
-              title: data[i].title || "None",
-              duration: data[i].duration === data[i + 1]?.duration
+              title: data[i]?.title || "None",
+              duration: data[i]?.duration === data[i + 1]?.duration
                 ? ""
-                : data[i].duration || "None",
+                : data[i]?.duration || "None",
               rating: null,
-              video: `${c.XVIDEOS}/embedframe/${$(el).find("img").attr("data-videoid")}`
+              video: `${c.XVIDEOS}/embedframe/${videoId}`
             };
           }).get();
 
-        this.search = this.search.filter((el: any) => {
+        this.search = this.search.filter((el) => {
           return !el.id.includes("THUMBNUM");
         });
-        this.search = this.search.filter((el: any) => {
+        this.search = this.search.filter((el) => {
           return el.id.includes("/video");
         });
       }
     }
-    
+
     const xv = new XvideosSearch();
     if (xv.search.length === 0) throw Error("No result found");
-    const data = xv.search as unknown as string[];
     const result: ISearchVideoData = {
       success: true,
-      data: data,
+      data: xv.search as unknown as string[],
       source: url,
     };
     return result;
@@ -62,4 +61,4 @@ export async function scrapeContent(url: string) {
     const e = err as Error;
     throw Error(e.message);
   }
-}
+}

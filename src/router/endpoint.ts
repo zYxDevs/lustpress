@@ -1,7 +1,4 @@
-import cors from "cors";
-import { Router } from "express";
-import { slow, limiter } from "../utils/limit-options";
-
+import { Elysia, t } from "elysia";
 
 // EPorner
 import { getEporner } from "../controller/eporner/epornerGet";
@@ -51,43 +48,160 @@ import { searchYouporn } from "../controller/youporn/youpornSearch";
 import { relatedYouporn } from "../controller/youporn/youpornGetRelated";
 import { randomYouporn } from "../controller/youporn/youpornRandom";
 
-function scrapeRoutes() {
-  const router = Router();
+const queryId = {
+  query: t.Object({ id: t.String() }),
+};
 
-  router.get("/pornhub/get", cors(), slow, limiter, getPornhub);
-  router.get("/pornhub/search", cors(), slow, limiter, searchPornhub);
-  router.get("/pornhub/random", cors(), slow, limiter, randomPornhub);
-  router.get("/pornhub/related", cors(), slow, limiter, relatedPornhub);
-  router.get("/xnxx/get", cors(), slow, limiter, getXnxx);
-  router.get("/xnxx/search", cors(), slow, limiter, searchXnxx);
-  router.get("/xnxx/related", cors(), slow, limiter, relatedXnxx);
-  router.get("/xnxx/random", cors(), slow, limiter, randomXnxx);
-  router.get("/redtube/get", cors(), slow, limiter, getRedtube);
-  router.get("/redtube/search", cors(), slow, limiter, searchRedtube);
-  router.get("/redtube/related", cors(), slow, limiter, relatedRedtube);
-  router.get("/redtube/random", cors(), slow, limiter, randomRedtube);
-  router.get("/xvideos/get", cors(), slow, limiter, getXvideos);
-  router.get("/xvideos/search", cors(), slow, limiter, searchXvideos);
-  router.get("/xvideos/random", cors(), slow, limiter, randomXvideos);
-  router.get("/xvideos/related", cors(), slow, limiter, relatedXvideos);
-  router.get("/xhamster/get", cors(), slow, limiter, getXhamster);
-  router.get("/xhamster/search", cors(), slow, limiter, searchXhamster);
-  router.get("/xhamster/random", cors(), slow, limiter, randomXhamster);
-  router.get("/xhamster/related", cors(), slow, limiter, relatedXhamster);
-  router.get("/youporn/get", cors(), slow, limiter, getYouporn);
-  router.get("/youporn/search", cors(), slow, limiter, searchYouporn);
-  router.get("/youporn/related", cors(), slow, limiter, relatedYouporn);
-  router.get("/youporn/random", cors(), slow, limiter, randomYouporn);
-  router.get("/eporner/get", cors(), slow, limiter, getEporner);
-  router.get("/eporner/search", cors(), slow, limiter, searchEporner);
-  router.get("/eporner/related", cors(), slow, limiter, relatedEporner);
-  router.get("/eporner/random", cors(), slow, limiter, randomEporner);
-  router.get("/txxx/get", cors(), slow, limiter, getTxxx);
-  router.get("/txxx/search", cors(), slow, limiter, searchTxxx);
-  router.get("/txxx/related", cors(), slow, limiter, relatedTxxx);
-  router.get("/txxx/random", cors(), slow, limiter, randomTxxx);
-  
-  return router;
-}
+const querySearch = {
+  query: t.Object({
+    key: t.String(),
+    page: t.Optional(t.String()),
+  }),
+};
 
-export default scrapeRoutes;
+export const scrapeRoutes = (app: Elysia) =>
+  app
+    .group("/pornhub", (app) =>
+      app
+        .get("/get", getPornhub, {
+          ...queryId,
+          detail: { summary: "Get Pornhub video data", tags: ["Pornhub"] },
+        })
+        .get("/search", searchPornhub, {
+          ...querySearch,
+          detail: { summary: "Search Pornhub videos", tags: ["Pornhub"] },
+        })
+        .get("/random", randomPornhub, {
+          detail: { summary: "Get random Pornhub videos", tags: ["Pornhub"] },
+        })
+        .get("/related", relatedPornhub, {
+          ...queryId,
+          detail: { summary: "Get related Pornhub videos", tags: ["Pornhub"] },
+        })
+    )
+    .group("/xnxx", (app) =>
+      app
+        .get("/get", getXnxx, {
+          ...queryId,
+          detail: { summary: "Get XNXX video data", tags: ["XNXX"] },
+        })
+        .get("/search", searchXnxx, {
+          ...querySearch,
+          detail: { summary: "Search XNXX videos", tags: ["XNXX"] },
+        })
+        .get("/related", relatedXnxx, {
+          ...queryId,
+          detail: { summary: "Get related XNXX videos", tags: ["XNXX"] },
+        })
+        .get("/random", randomXnxx, {
+          detail: { summary: "Get random XNXX videos", tags: ["XNXX"] },
+        })
+    )
+    .group("/redtube", (app) =>
+      app
+        .get("/get", getRedtube, {
+          ...queryId,
+          detail: { summary: "Get RedTube video data", tags: ["RedTube"] },
+        })
+        .get("/search", searchRedtube, {
+          ...querySearch,
+          detail: { summary: "Search RedTube videos", tags: ["RedTube"] },
+        })
+        .get("/related", relatedRedtube, {
+          ...queryId,
+          detail: { summary: "Get related RedTube videos", tags: ["RedTube"] },
+        })
+        .get("/random", randomRedtube, {
+          detail: { summary: "Get random RedTube videos", tags: ["RedTube"] },
+        })
+    )
+    .group("/xvideos", (app) =>
+      app
+        .get("/get", getXvideos, {
+          ...queryId,
+          detail: { summary: "Get Xvideos video data", tags: ["Xvideos"] },
+        })
+        .get("/search", searchXvideos, {
+          ...querySearch,
+          detail: { summary: "Search Xvideos videos", tags: ["Xvideos"] },
+        })
+        .get("/random", randomXvideos, {
+          detail: { summary: "Get random Xvideos videos", tags: ["Xvideos"] },
+        })
+        .get("/related", relatedXvideos, {
+          ...queryId,
+          detail: { summary: "Get related Xvideos videos", tags: ["Xvideos"] },
+        })
+    )
+    .group("/xhamster", (app) =>
+      app
+        .get("/get", getXhamster, {
+          ...queryId,
+          detail: { summary: "Get Xhamster video data", tags: ["Xhamster"] },
+        })
+        .get("/search", searchXhamster, {
+          ...querySearch,
+          detail: { summary: "Search Xhamster videos", tags: ["Xhamster"] },
+        })
+        .get("/random", randomXhamster, {
+          detail: { summary: "Get random Xhamster videos", tags: ["Xhamster"] },
+        })
+        .get("/related", relatedXhamster, {
+          ...queryId,
+          detail: { summary: "Get related Xhamster videos", tags: ["Xhamster"] },
+        })
+    )
+    .group("/youporn", (app) =>
+      app
+        .get("/get", getYouporn, {
+          ...queryId,
+          detail: { summary: "Get YouPorn video data", tags: ["YouPorn"] },
+        })
+        .get("/search", searchYouporn, {
+          ...querySearch,
+          detail: { summary: "Search YouPorn videos", tags: ["YouPorn"] },
+        })
+        .get("/related", relatedYouporn, {
+          ...queryId,
+          detail: { summary: "Get related YouPorn videos", tags: ["YouPorn"] },
+        })
+        .get("/random", randomYouporn, {
+          detail: { summary: "Get random YouPorn videos", tags: ["YouPorn"] },
+        })
+    )
+    .group("/eporner", (app) =>
+      app
+        .get("/get", getEporner, {
+          ...queryId,
+          detail: { summary: "Get EPorner video data", tags: ["EPorner"] },
+        })
+        .get("/search", searchEporner, {
+          ...querySearch,
+          detail: { summary: "Search EPorner videos", tags: ["EPorner"] },
+        })
+        .get("/related", relatedEporner, {
+          ...queryId,
+          detail: { summary: "Get related EPorner videos", tags: ["EPorner"] },
+        })
+        .get("/random", randomEporner, {
+          detail: { summary: "Get random EPorner videos", tags: ["EPorner"] },
+        })
+    )
+    .group("/txxx", (app) =>
+      app
+        .get("/get", getTxxx, {
+          ...queryId,
+          detail: { summary: "Get TXXX video data", tags: ["TXXX"] },
+        })
+        .get("/search", searchTxxx, {
+          ...querySearch,
+          detail: { summary: "Search TXXX videos", tags: ["TXXX"] },
+        })
+        .get("/related", relatedTxxx, {
+          ...queryId,
+          detail: { summary: "Get related TXXX videos", tags: ["TXXX"] },
+        })
+        .get("/random", randomTxxx, {
+          detail: { summary: "Get random TXXX videos", tags: ["TXXX"] },
+        })
+    );

@@ -1,9 +1,7 @@
 import { load } from "cheerio";
-import LustPress from "../../LustPress";
+import { lust } from "../../LustPress";
 import c from "../../utils/options";
-import { ISearchVideoData } from "../../interfaces";
-
-const lust = new LustPress();
+import { ISearchVideoData, PornhubSearchItem } from "../../interfaces";
 
 export async function scrapeContent(url: string) {
   try {
@@ -11,17 +9,17 @@ export async function scrapeContent(url: string) {
     const $ = load(res);
 
     class PornhubSearch {
-      search: object[];
-      data: object;
+      search: PornhubSearchItem[];
+      data: PornhubSearchItem[];
       constructor() {
         this.search = $("div.wrap")
           .map((i, el) => {
-            const link = $(el).find("a").attr("href");
-            const id = link?.split("=")[1];
-            const title = $(el).find("a").attr("title");
-            const image = $(el).find("img").attr("src");
-            const duration = $(el).find("var.duration").text();
-            const views = $(el).find("div.videoDetailsBlock").find("span.views").text();
+            const link = $(el).find("a").attr("href") || "";
+            const id = link.split("=")[1] || "None";
+            const title = $(el).find("a").attr("title") || "None";
+            const image = $(el).find("img").attr("src") || "None";
+            const duration = $(el).find("var.duration").text() || "None";
+            const views = $(el).find("div.videoDetailsBlock").find("span.views").text() || "None";
             return {
               link: `${c.PORNHUB}${link}`,
               id: id,
@@ -33,27 +31,24 @@ export async function scrapeContent(url: string) {
             };
           }).get();
 
-        this.data = this.search.filter((el: any) => {
+        this.data = this.search.filter((el) => {
           return el.link.includes("javascript:void(0)") === false && el.image?.startsWith("data:image") === false;
         });
       }
 
     }
-    
+
     const ph = new PornhubSearch();
     if (ph.search.length === 0) throw Error("No result found");
-    const data = ph.data as string[];
     const result: ISearchVideoData = {
       success: true,
-      data: data,
+      data: ph.data as unknown as string[],
       source: url,
     };
     return result;
-    
 
-   
   } catch (err) {
     const e = err as Error;
     throw Error(e.message);
   }
-}
+}

@@ -1,9 +1,7 @@
 import { load } from "cheerio";
-import LustPress from "../../LustPress";
+import { lust } from "../../LustPress";
 import c from "../../utils/options";
 import { ISearchVideoData } from "../../interfaces";
-
-const lust = new LustPress();
 
 export async function scrapeContent(url: string) {
   try {

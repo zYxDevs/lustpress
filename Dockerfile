@@ -1,17 +1,26 @@
-FROM node:22
-
+FROM oven/bun:1.3.13-alpine AS base
 WORKDIR /srv/app
 
-COPY package*.json ./
-RUN npm install
+# 1. Install production dependencies only
+FROM base AS deps
+COPY package.json bun.lock ./
+RUN bun install --production
 
-# install browser + system deps
-RUN npx playwright install --with-deps chromium
-
+# 2. Builder stage to compile TypeScript
+FROM base AS builder
+COPY package.json bun.lock ./
+RUN bun install
 COPY . .
+RUN bun run build
 
-RUN npm run build
+# 3. Final release stage
+FROM base AS release
+COPY --from=deps /srv/app/node_modules ./node_modules
+COPY --from=builder /srv/app/build ./build
+COPY package.json ./
 
+# Run as non-root user
+USER bun
 EXPOSE 3000
 
-CMD ["node", "build/src/index.js"]
+CMD ["bun", "run", "start"]

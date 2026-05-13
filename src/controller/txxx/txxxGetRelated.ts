@@ -1,10 +1,5 @@
-import { Request, Response } from "express";
-import LustPress from "../../LustPress";
-import { maybeError } from "../../utils/modifier";
-import { logger } from "../../utils/logger";
-import { ISearchVideoData } from "../../interfaces";
-
-const lust = new LustPress();
+import { lust } from "../../LustPress";
+import { ISearchVideoData, TxxxRelatedResponse } from "../../interfaces";
 
 function getRelatedApiUrl(videoId: string, page = 1, count = 50): string {
   const id = Number(videoId);
@@ -19,10 +14,14 @@ function getRelatedApiUrl(videoId: string, page = 1, count = 50): string {
   );
 }
 
-export async function relatedTxxx(req: Request, res: Response) {
+export async function relatedTxxx({
+  query,
+}: {
+  query: { id: string; page?: string };
+}) {
   try {
-    const id = String(req.query.id || "").trim();
-    const page = Number(req.query.page || 1);
+    const { id } = query;
+    const page = Number(query.page || 1);
 
     if (!id) throw new Error("Parameter id is required");
     if (Number.isNaN(page)) throw new Error("Parameter page must be a number");
@@ -30,14 +29,14 @@ export async function relatedTxxx(req: Request, res: Response) {
     const apiUrl = getRelatedApiUrl(id, page);
 
     const buffer = await lust.fetchBody(apiUrl);
-    const rawData = JSON.parse(buffer.toString("utf-8"));
+    const rawData = JSON.parse(buffer.toString("utf-8")) as TxxxRelatedResponse;
 
     const videos = Array.isArray(rawData.videos) ? rawData.videos : [];
 
-    const data = videos.map((v: any) => ({
-      id: v.video_id,
+    const data = videos.map((v) => ({
+      id: String(v.video_id),
       title: v.title,
-      image: v.scr || v.thumb || null,
+      image: v.scr || v.thumb || "",
       duration: v.duration || "None",
       views: v.video_viewed || "0",
       rating: v.rating || "0",
@@ -46,24 +45,16 @@ export async function relatedTxxx(req: Request, res: Response) {
       video: `https://txxx.com/embed/${v.video_id}/`,
     }));
 
-    logger.info({
-      path: req.path,
-      query: req.query,
-      method: req.method,
-      ip: req.ip,
-      useragent: req.get("User-Agent"),
-    });
-
-    return res.json({
+    return {
       success: true,
-      total_count: rawData.total_count || "0",
+      total_count: String(rawData.total_count || "0"),
       pages: rawData.pages || 1,
       page,
       data,
       source: `https://txxx.com/videos/${id}/`,
-    } as ISearchVideoData);
+    } as unknown as ISearchVideoData;
   } catch (err) {
     const e = err as Error;
-    return res.status(400).json(maybeError(false, e.message));
+    throw new Error(e.message);
   }
 }

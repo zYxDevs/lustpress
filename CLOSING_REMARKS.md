@@ -4,7 +4,7 @@ I hope you have found this project useful. All the major credit really goes to t
 allows this services to operate.
 
 Core dependencies:
-- [express](https://github.com/expressjs/express)
+- [elysia](https://elysiajs.com/)
 - [cheerio](https://cheerio.js.org/)
 - [keyv](https://github.com/jaredwray/keyv)
 

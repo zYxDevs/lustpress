@@ -1,21 +1,15 @@
-import { Request, Response } from "express";
-import LustPress from "../../LustPress";
-import { maybeError } from "../../utils/modifier";
-import { logger } from "../../utils/logger";
+import { lust } from "../../LustPress";
+import { TxxxSearchResponse as TxxxResponse } from "../../interfaces";
 
-const lust = new LustPress();
-
-export async function randomTxxx(req: Request, res: Response) {
+export async function randomTxxx() {
   try {
     const apiUrl =
-            "https://txxx.com/api/json/videos2/14400/str/most-popular/60/..1.all..day.json";
+      "https://txxx.com/api/json/videos2/14400/str/most-popular/60/..1.all..day.json";
 
     const buffer = await lust.fetchBody(apiUrl);
-    const rawData = JSON.parse(buffer.toString("utf-8"));
+    const rawData = JSON.parse(buffer.toString("utf-8")) as TxxxResponse;
 
-    const videos = Array.isArray(rawData.videos)
-      ? rawData.videos
-      : [];
+    const videos = Array.isArray(rawData.videos) ? rawData.videos : [];
 
     if (videos.length === 0) {
       throw new Error("No videos returned from upstream");
@@ -39,20 +33,15 @@ export async function randomTxxx(req: Request, res: Response) {
       embed: `https://txxx.com/embed/${v.video_id}/`,
     };
 
-    logger.info({
-      path: req.path,
-      method: req.method,
-      ip: req.ip,
-      useragent: req.get("User-Agent"),
-    });
-
-    return res.json({
+    return {
       success: true,
       data,
       source: apiUrl,
-    });
+    };
   } catch (err) {
     const e = err as Error;
-    return res.status(400).json(maybeError(false, e.message));
+    throw new Error(e.message);
   }
 }
+
+

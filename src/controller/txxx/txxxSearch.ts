@@ -1,40 +1,27 @@
-import { Request, Response } from "express";
-import LustPress from "../../LustPress";
-import { maybeError } from "../../utils/modifier";
+import { lust } from "../../LustPress";
+import { TxxxSearchResponse } from "../../interfaces";
 
-const lust = new LustPress();
-
-export async function searchTxxx(req: Request, res: Response) {
+export async function searchTxxx({
+  query,
+}: {
+  query: { key: string; page?: string };
+}) {
   try {
-    const key = String(req.query.key || "").trim();
-    const page = Number(req.query.page || 1);
-
-    if (!key) {
-      return res.json({
-        success: false,
-        error: "Parameter key is required",
-      });
-    }
-
-    if (Number.isNaN(page)) {
-      return res.json({
-        success: false,
-        error: "Parameter page must be a number",
-      });
-    }
+    const { key } = query;
+    const page = Number(query.page || 1);
 
     const apiUrl =
-            "https://txxx.com/api/videos2.php" +
-            `?params=259200/str/relevance/60/search..${page}.all..` +
-            `&s=${encodeURIComponent(key)}`;
+      "https://txxx.com/api/videos2.php" +
+      `?params=259200/str/relevance/60/search..${page}.all..` +
+      `&s=${encodeURIComponent(key)}`;
 
     // Fetch from API directly
     const buffer = await lust.fetchBody(apiUrl);
-    const rawData = JSON.parse(buffer.toString("utf-8"));
+    const rawData = JSON.parse(buffer.toString("utf-8")) as TxxxSearchResponse;
 
     const videos = Array.isArray(rawData.videos) ? rawData.videos : [];
 
-    const data = videos.map((v: any) => ({
+    const data = videos.map((v) => ({
       video_id: v.video_id,
       title: v.title,
       dir: v.dir,
@@ -49,15 +36,17 @@ export async function searchTxxx(req: Request, res: Response) {
       embed: `https://txxx.com/embed/${v.video_id}/`,
     }));
 
-    return res.json({
+    return {
       success: true,
       total_count: String(rawData.total_count ?? videos.length),
       pages: Number(rawData.pages ?? 1),
       page,
       data,
-    });
+    };
   } catch (err) {
     const e = err as Error;
-    return res.json(maybeError(false, e.message));
+    throw new Error(e.message);
   }
 }
+
+

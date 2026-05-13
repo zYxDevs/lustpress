@@ -1,42 +1,8 @@
 import { scrapeContent as searchScrape } from "../../scraper/eporner/epornerSearchController";
 import { scrapeContent as videoScrape } from "../../scraper/eporner/epornerGetController";
 import c from "../../utils/options";
-import { logger } from "../../utils/logger";
-import { maybeError } from "../../utils/modifier";
-import { Request, Response } from "express";
 
-export async function randomEporner(req: Request, res: Response) {
-  /**
-   * @api {get} /eporner/random Get random eporner
-   * @apiName Get random eporner
-   * @apiGroup eporner
-   * @apiDescription Get a random eporner video
-   *
-   * @apiParam {String} id Video ID
-   *
-   * @apiSuccessExample {json} Success-Response:
-   *   HTTP/1.1 200 OK
-   *   HTTP/1.1 400 Bad Request
-   *
-   * @apiExample {curl} curl
-   * curl -i https://lust.scathach.id/eporner/random
-   *
-   * @apiExample {js} JS/TS
-   * import axios from "axios"
-   *
-   * axios.get("https://lust.scathach.id/eporner/random")
-   * .then(res => console.log(res.data))
-   * .catch(err => console.error(err))
-   *
-   * @apiExample {python} Python
-   * import aiohttp
-   * async with aiohttp.ClientSession() as session:
-   *  async with session.get("https://lust.scathach.id/eporner/random") as resp:
-   *    print(await resp.json())
-   */
-
-  // cat/all/SORT-top-weekly/
-
+export async function randomEporner() {
   try {
     const weeklyUrl = `${c.EPORNER}/cat/all/SORT-top-weekly/`;
     const list = await searchScrape(weeklyUrl);
@@ -58,15 +24,9 @@ export async function randomEporner(req: Request, res: Response) {
     const url = `${c.EPORNER}/${path}`;
     const data = await videoScrape(url);
 
-    logger.info({
-      path: req.path,
-      method: req.method,
-      ip: req.ip,
-      useragent: req.get("User-Agent"),
-    });
-
-    return res.json(data);
+    return data;
   } catch (err) {
-    res.status(400).json(maybeError(false, (err as Error).message));
+    const e = err as Error;
+    throw new Error(e.message);
   }
-}
+}

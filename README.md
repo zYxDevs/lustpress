@@ -7,7 +7,7 @@
 	<a href="https://codeclimate.com/github/sinkaroid/lustpress/maintainability"><img src="https://api.codeclimate.com/v1/badges/29a2be78f853f9e3a4a3/maintainability" /></a>
 </p>
 
-Lustpress stand for Lust and **Express**, rebuild from [Jandapress](https://github.com/sinkaroid/jandapress) with completely different approach.
+Lustpress was originally named Lust and Express (legacy name) and now runs on **Bun** + **Elysia** a high-performance remake from the ground up using Bun.
 The motivation of this project is to bring you an actionable data related to pornhub and other r18 sites with gather, similar design pattern, endpoint bindings, and consistent structure in mind.
 
 <a href="https://sinkaroid.github.io/lustpress">Playground</a> •
@@ -17,7 +17,7 @@ The motivation of this project is to bring you an actionable data related to por
 
 ---
 
-<a href="http://localhost:3000/"><img align="right" src="resources/project/images/bnnuy.png" width="320"></a>
+<a href="http://localhost:3000/"><img align="right" src="resources/project/images/nun.png" width="320"></a>
 
 - [Lustpress](#)
   - [The problem](#the-problem)
@@ -32,11 +32,10 @@ The motivation of this project is to bring you an actionable data related to por
   - [Playground](https://sinkaroid.github.io/lustpress)
     - [Routing](#playground)
     - [Status response](#status-response)
+  - [Pornhub JS Challenge Solver](#pornhub-js-challenge-solver)
   - [CLosing remarks](https://github.com/sinkaroid/lustpress/blob/master/CLOSING_REMARKS.md)
     - [Alternative links](https://github.com/sinkaroid/lustpress/blob/master/CLOSING_REMARKS.md#alternative-links)
   - [Pronunciation](#Pronunciation)
-  - [Client libraries](#client-libraries)
-  - [Acknowledgements](#acknowledgements)
   - [Legal](#legal)
   - [Discontinued playground](#frequently-asked-questions)
   - [again, discontinued playground](#frequently-asked-questions)
@@ -81,7 +80,7 @@ Some tests may fail in CI environments because certain websites restrict or bloc
 
 ## Prerequisites
 <table>
-	<td><b>NOTE:</b> NodeJS 22.x or higher</td>
+	<td><b>NOTE:</b> Bun 1.3.13 or higher</td>
 </table>
 
 To handle several requests from each website, You will also need [Redis](https://redis.io/) for persistent caching, free tier is available on [Redis Labs](https://redislabs.com/), You can also choose another adapters as we using [keyv](https://github.com/jaredwray/keyv) Key-value storage with support for multiple backends. When you choosing your own adapter, all data must be stored with `<Buffer>` type.
@@ -90,9 +89,6 @@ To handle several requests from each website, You will also need [Redis](https:/
 Rename `.env.schema` to `.env` and fill the value with your own
 
 ```bash
-# railway, fly.dev, heroku, vercel or any free service
-RAILWAY = sinkaroid
-
 # default port
 PORT = 3000
 
@@ -103,7 +99,7 @@ REDIS_URL = redis://default:somenicepassword@redis-666.c10.us-east-6-6.ec666.clo
 EXPIRE_CACHE = 1
 
 # you must identify your origin, if not set it will use default
-USER_AGENT = "lustpress/8.0.1 Node.js/22.22.0"
+USER_AGENT = "lustpress/8.2.0-alpha Bun/1.3.13"
 ```
 
 ### Docker
@@ -118,7 +114,7 @@ docker run -d \
   -p 3028:3000 \
   -e REDIS_URL='redis://default:somenicepassword@redis-666.c10.us-east-6-6.ec666.cloud.redislabs.com:1337' \
   -e EXPIRE_CACHE='1' \
-  -e USER_AGENT='lustpress/8.0.1 Node.js/22.22.0' \
+  -e USER_AGENT='lustpress/8.2.0-alpha Bun/1.3.13' \
   ghcr.io/sinkaroid/lustpress:latest
 ```
 
@@ -127,43 +123,42 @@ docker run -d \
     git clone https://github.com/sinkaroid/lustpress.git
 
 - Install dependencies
-  - `npm install / yarn install`
+  - `bun install`
 - Lustpress production
-  - `npm run start:prod`
+  - `bun run start:prod`
 - Lustpress testing and hot reload
-  - `npm run start:dev`
+  - `bun run start:dev`
 
-## Tests
+## Running tests
 Run the following commands to execute tests for each supported source:
 
 ```bash
 # Check whether all supported sites are available for scraping
-npm run test
+bun run test
 
 # Check whether ph and (maybe the others do..) do Solving challenge in their website
-npm run test:mock
+bun run test:mock
 
 # Run tests for individual sources
-npm run test:pornhub
-npm run test:xnxx
-npm run test:redtube
-npm run test:xvideos
-npm run test:xhamster
-npm run test:youporn
-npm run test:eporner
-npm run test:txxx
+bun run test:pornhub
+bun run test:xnxx
+bun run test:redtube
+bun run test:xvideos
+bun run test:xhamster
+bun run test:youporn
+bun run test:eporner
+bun run test:txxx
 ```
 
 
-
 ### Start the production server
-`npm run start:prod`
+`bun run start:prod`
 
 ### Running development server
-`npm run start:dev`
+`bun run start:dev`
 
 ### Generating playground like swagger from apidoc definition
-`npm run build:apidoc`
+`bun run build:apidoc`
 
 > To running other tests, you can see object scripts in file `package.json` or modify the `lustpress.test.ts` according your needs
 
@@ -298,6 +293,21 @@ https://sinkaroid.github.io/lustpress/#api-txxx
     HTTP/1.1 400 Bad Request
     HTTP/1.1 500 Fail to get data
 
+## Pornhub JS Challenge Solver
+Pornhub serves a JavaScript challenge page to detect automated requests. Instead of relying on a headless browser (Playwright/Puppeteer), Lustpress solves this natively with zero external dependencies.
+
+**How it works:**
+- Fetch the index page and capture initial session cookies
+- Detect the `leastFactor` math challenge in the response HTML
+- Parse obfuscated variables (`p`, `s`) and conditional bitwise operations
+- Compute the correct `KEY` cookie value
+- Verify the solved cookie against the index
+- Cache and reuse cookies for subsequent requests, auto-refresh on expiry
+
+This approach runs in **< 1ms** compared to 5-10s with a headless browser, uses virtually no memory, and is fully **Docker-friendly** — no Chromium installation required.
+
+The solver logic lives in [`src/utils/ph-solver.ts`](src/utils/ph-solver.ts). If Pornhub changes its obfuscation pattern, update the regex patterns in that file.
+
 ## Frequently asked questions 
 **Q: The website response is slow**  
 > That's unfortunate, this repository was opensource already, You can host and deploy Lustpress with your own instance. Any fixes and improvements will updating to this repo.  
@@ -309,13 +319,6 @@ To continue using Lustpress, please deploy and run your own self-hosted instance
 
 ## Pronunciation
 `en_US` • **/lʌstˈprɛs/** — "lust" stand for this project and "press" for express.
-
-
-## Client libraries
-Seamlessly integrate with the languages you love, simplified the usage, and intelisense definitions on your IDEs
-
-- TBD
-- Or [create your own](https://github.com/sinkaroid/lustpress/edit/master/README.md)
 
 
 ## Legal

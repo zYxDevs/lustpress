@@ -1,203 +1,135 @@
 import { URL } from "node:url";
-import { chromium } from "playwright";
-import p, { IResponse } from "phin";
 import Keyv from "keyv";
 import KeyvRedis from "@keyv/redis";
 import pkg from "../package.json";
+import { solveChallenge } from "./utils/ph-solver";
 
 const keyv = process.env.REDIS_URL
   ? new Keyv({ store: new KeyvRedis(process.env.REDIS_URL) })
   : new Keyv();
 
-keyv.on("error", err => console.log("Connection Error", err));
+keyv.on("error", (err) => console.log("Connection Error", err));
 const ttl = 1000 * 60 * 60 * Number(process.env.EXPIRE_CACHE);
 
-class LustPress {
+const GEO_TIMEOUT_MS = 3000;
+let cachedLastLocation: string | null = null;
+let lastLocationTimestamp = 0;
 
+function cachedLocationOrUnknown(): string {
+  if (cachedLastLocation && Date.now() - lastLocationTimestamp < 3600_000) {
+    return cachedLastLocation;
+  }
+  return "Unknown, Unknown";
+}
+
+class LustPress {
   url: string;
   useragent: string;
+  private browserUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36";
   private cookieCache: { [domain: string]: string } = {};
-
 
   constructor() {
     this.url = "";
-    this.useragent = `${pkg.name}/${pkg.version} Node.js/${process.versions.node}`;
+    this.useragent = `${pkg.name}/${pkg.version} Bun/${Bun.version}`;
   }
 
-  async getCookies(url: string): Promise<string> {
-    const browser = await chromium.launch({ headless: true });
+  async getPornhubCookies(): Promise<string> {
+    const baseUrl = "https://www.pornhub.com/";
+    const headers = {
+      "User-Agent": this.browserUA,
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Connection": "keep-alive",
+      "Upgrade-Insecure-Requests": "1"
+    };
 
-    const context = await browser.newContext({
-      userAgent: process.env.USER_AGENT || `${pkg.name}/${pkg.version} Node.js/${process.versions.node}`
-    });
+    console.log("Fetching Pornhub Index for cookies...");
+    let res = await fetch(baseUrl, { headers, redirect: "follow" });
+    
+    // Get cookies from set-cookie headers
+    const initialCookies = res.headers.getSetCookie().map(c => c.split(";")[0]).join("; ");
+    let text = await res.text();
 
-    const page = await context.newPage();
-    await page.goto(url, { waitUntil: "domcontentloaded" });
-    await page.waitForLoadState("networkidle");
-    const cookies = await context.cookies();
-    await browser.close();
-    return cookies.map(c => `${c.name}=${c.value}`).join("; ");
-  }
-
-  /**
-   * Fetch body from url and check if it's cached
-   * @param url url to fetch
-   * @returns Buffer 
-   */
-  async fetchBody(url: string): Promise<Buffer> {
-
-    const cached = await keyv.get(url);
-
-    if (cached) {
-      console.log("Fetching from cache");
-      return cached;
-
-    } else if (url.includes("/random")) {
-
-      console.log("Random should not be cached");
-
-      const isPornhub = /pornhub\.com/i.test(url);
-
-      let cookieHeader = "";
-
-      if (isPornhub) {
-        const domain = new URL(url).hostname;
-
-        if (this.cookieCache[domain]) {
-          console.log("Using cached cookie");
-          cookieHeader = this.cookieCache[domain];
-        } else {
-          console.log("Solving challenge via playwright");
-          cookieHeader = await this.getCookies(url);
-          this.cookieCache[domain] = cookieHeader;
-        }
-      }
-
-      console.log(`Fetching from ${isPornhub ? "phin (cookie)" : "phin"}`);
-
-      const res = await p({
-        url: url,
-        headers: {
-          "User-Agent": process.env.USER_AGENT || `${pkg.name}/${pkg.version} Node.js/${process.versions.node}`,
-          ...(cookieHeader && { "Cookie": cookieHeader })
-        },
-        followRedirects: true
+    if (text.includes("leastFactor")) {
+      console.log("Pornhub Challenge detected at Index. Solving...");
+      const challengeCookie = await solveChallenge(text);
+      const combinedCookies = [initialCookies, challengeCookie, "age_verified=1"].filter(Boolean).join("; ");
+      
+      // Verify cookies
+      console.log("Verifying cookies at Index...");
+      res = await fetch(baseUrl, { 
+        headers: { ...headers, Cookie: combinedCookies },
+        redirect: "follow"
       });
-
-      if (isPornhub && res.statusCode !== 200) {
-        const domain = new URL(url).hostname;
-        console.log("Cookie invalid, clearing cache and retrying via playwright");
-        delete this.cookieCache[domain];
-        const newCookie = await this.getCookies(url);
-        this.cookieCache[domain] = newCookie;
-        const retry = await p({
-          url: url,
-          headers: {
-            "User-Agent": process.env.USER_AGENT || `${pkg.name}/${pkg.version} Node.js/${process.versions.node}`,
-            "Cookie": newCookie
-          },
-          followRedirects: true
-        });
-        return retry.body;
+      text = await res.text();
+      
+      if (!text.includes("leastFactor")) {
+        console.log("Pornhub cookies verified!");
+        return combinedCookies;
+      } else {
+        console.log("Warning: Challenge still present after solve attempt.");
+        return combinedCookies;
       }
-
-      return res.body;
-
-    } else {
-
-      console.log("Fetching from source");
-      url = url.replace(/\/\//g, "/");
-      const isPornhub = /pornhub\.com/i.test(url);
-
-      let cookieHeader = "";
-
-      if (isPornhub) {
-        const domain = new URL(url).hostname;
-
-        if (this.cookieCache[domain]) {
-          console.log("Using cached cookie");
-          cookieHeader = this.cookieCache[domain];
-        } else {
-          console.log("Solving challenge via playwright");
-          cookieHeader = await this.getCookies(url);
-          this.cookieCache[domain] = cookieHeader;
-        }
-      }
-
-      console.log(`Fetching from ${isPornhub ? "phin (cookie)" : "phin"}`);
-
-      const res = await p({
-        url: url,
-        headers: {
-          "User-Agent": process.env.USER_AGENT || `${pkg.name}/${pkg.version} Node.js/16.9.1`,
-          ...(cookieHeader && { "Cookie": cookieHeader })
-        },
-        followRedirects: true
-      });
-
-      if (isPornhub && res.statusCode !== 200) {
-        const domain = new URL(url).hostname;
-        console.log("Cookie invalid, clearing cache and retrying via playwright");
-        delete this.cookieCache[domain];
-        const newCookie = await this.getCookies(url);
-        this.cookieCache[domain] = newCookie;
-        const retry = await p({
-          url: url,
-          headers: {
-            "User-Agent": process.env.USER_AGENT || `${pkg.name}/${pkg.version} Node.js/16.9.1`,
-            "Cookie": newCookie
-          },
-          followRedirects: true
-        });
-        return retry.body;
-      }
-
-      await keyv.set(url, res.body, ttl);
-
-      return res.body;
     }
+    
+    return initialCookies || "age_verified=1";
   }
 
-  /**
-   * remove html tag and bunch of space
-   * @param str string to remove html tag
-   * @returns string
-   */
+  async fetchBody(url: string): Promise<Buffer> {
+    const cached = await keyv.get(url);
+    if (cached) return cached;
+
+    const isPornhub = /pornhub\.com/i.test(url);
+    const domain = new URL(url).hostname;
+
+    const headers: Record<string, string> = {
+      "User-Agent": isPornhub ? this.browserUA : this.useragent,
+    };
+
+    if (isPornhub) {
+      if (!this.cookieCache[domain]) {
+        this.cookieCache[domain] = await this.getPornhubCookies();
+      }
+      headers["Cookie"] = this.cookieCache[domain];
+      headers["Referer"] = "https://www.pornhub.com/";
+      headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8";
+      headers["Accept-Language"] = "en-US,en;q=0.9";
+    }
+
+    let res = await fetch(url, { headers, redirect: "follow" });
+    let text = await res.text();
+
+    if (isPornhub && text.includes("leastFactor")) {
+      console.log("Challenge detected at target URL. Re-authenticating...");
+      this.cookieCache[domain] = await this.getPornhubCookies();
+      res = await fetch(url, { 
+        headers: { ...headers, Cookie: this.cookieCache[domain] },
+        redirect: "follow" 
+      });
+      text = await res.text();
+    }
+
+    const body = Buffer.from(text);
+    if (!url.includes("/random")) await keyv.set(url, body, ttl);
+    return body;
+  }
+
+  // Utility methods
   removeHtmlTag(str: string): string {
-    str = str.replace(/(\r\n|\n|\r)/gm, "");
-    str = str.replace(/\s+/g, "");
-    return str;
+    return str.replace(/(\r\n|\n|\r)/gm, "").replace(/\s+/g, "");
   }
 
-  /**
-   * remove html tag without space
-   * @param str string to remove html tag
-   * @returns string
-   */
   removeHtmlTagWithoutSpace(str: string): string {
-    str = str.replace(/(\r\n|\n|\r|\t)/gm, "");
-    str = str.replace(/\\/g, "");
-    str = str.replace(/\s+/g, " ");
-    return str.trim();
+    return str.replace(/(\r\n|\n|\r|\t)/gm, "").replace(/\\/g, "").replace(/\s+/g, " ").trim();
   }
 
-  /**
-   * remove all single quote on array
-   * @param arr array to remove single quote
-   * @returns string[]
-   */
   removeAllSingleQuoteOnArray(arr: string[]): string[] {
     return arr.map((item) => item.replace(/'/g, ""));
   }
 
-  /**
-   * time ago converter
-   * @param input date to convert
-   * @returns string
-   */
   timeAgo(input: Date) {
     const date = new Date(input);
-    const formatter: any = new Intl.RelativeTimeFormat("en");
+    const formatter = new Intl.RelativeTimeFormat("en");
     const ranges: { [key: string]: number } = {
       years: 3600 * 24 * 365,
       months: 3600 * 24 * 30,
@@ -205,56 +137,73 @@ class LustPress {
       days: 3600 * 24,
       hours: 3600,
       minutes: 60,
-      seconds: 1
+      seconds: 1,
     };
     const secondsElapsed = (date.getTime() - Date.now()) / 1000;
     for (const key in ranges) {
       if (ranges[key] < Math.abs(secondsElapsed)) {
         const delta = secondsElapsed / ranges[key];
-        return formatter.format(Math.round(delta), key);
+        return formatter.format(Math.round(delta), key as Intl.RelativeTimeFormatUnit);
       }
     }
   }
 
-  /**
-   * convert seconds to minute
-   * @param seconds seconds to convert
-   * @returns string
-   */
   secondToMinute(seconds: number): string {
     const minutes = Math.floor(seconds / 60);
     const second = seconds % 60;
     return `${minutes}min, ${second}sec`;
   }
 
-  /**
-   * get current process memory usage
-   * @returns object
-   */
   currentProccess() {
-    const arr = [1, 2, 3, 4, 5, 6, 9, 7, 8, 9, 10];
-    arr.reverse();
     const rss = process.memoryUsage().rss / 1024 / 1024;
     const heap = process.memoryUsage().heapUsed / 1024 / 1024;
     const heaptotal = process.memoryUsage().heapTotal / 1024 / 1024;
     return {
       rss: `${Math.round(rss * 100) / 100} MB`,
-      heap: `${Math.round(heap * 100) / 100}/${Math.round(heaptotal * 100) / 100} MB`
+      heap: `${Math.round(heap * 100) / 100}/${Math.round(heaptotal * 100) / 100} MB`,
     };
   }
 
-  /**
-   * fetch this server location
-   * @returns <Promise<string>>
-   */
   async getServer(): Promise<string> {
-    const raw = await p({
-      "url": "http://ip-api.com/json",
-      "parse": "json"
-    }) as IResponse;
-    const data = raw.body as unknown as { country: string, regionName: string };
-    return `${data.country}, ${data.regionName}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), GEO_TIMEOUT_MS);
+
+    try {
+      // ip-api free tier often rejects HTTPS requests with 403;
+      const raw = await fetch("https://ipwho.is/", {
+        signal: controller.signal,
+      });
+      if (!raw.ok) {
+        return cachedLocationOrUnknown();
+      }
+      const data = await raw.json() as {
+        success?: boolean;
+        country?: string;
+        region?: string;
+      };
+      if (data.success === false) {
+        return cachedLocationOrUnknown();
+      }
+      const country = data.country?.trim();
+      const region = data.region?.trim();
+      if (!country || !region) {
+        return cachedLocationOrUnknown();
+      }
+
+      const location = `${country}, ${region}`;
+      cachedLastLocation = location;
+      lastLocationTimestamp = Date.now();
+      return location;
+    } catch {
+      return cachedLocationOrUnknown();
+    } finally {
+      clearTimeout(timeoutId);
+      if (!controller.signal.aborted) {
+        controller.abort();
+      }
+    }
   }
 }
 
+export const lust = new LustPress();
 export default LustPress;

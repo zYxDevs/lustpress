@@ -1,52 +1,56 @@
-import "dotenv/config";
-import LustPress from "./LustPress";
-import express from "express";
-import { Request, Response, NextFunction } from "express";
-import scrapeRoutes from "./router/endpoint";
-import { slow, limiter } from "./utils/limit-options";
-import { logger } from "./utils/logger";
-import * as pkg from "../package.json";
+import { Elysia } from "elysia";
+import { cors } from "@elysiajs/cors";
+import { swagger } from "@elysiajs/swagger";
+import { lust } from "./LustPress";
+import { scrapeRoutes } from "./router/endpoint";
+import pkg from "../package.json";
 
-const lust = new LustPress();
-const app = express();
-
-
-app.get("/", slow, limiter, async (req, res) => {
-  res.send({
+const app = new Elysia()
+  .use(cors())
+  .use(
+    swagger({
+      path: "/docs",
+      documentation: {
+        info: {
+          title: "Lustpress API",
+          version: pkg.version,
+          description: pkg.description,
+        },
+      },
+    })
+  )
+  .get("/", async () => ({
     success: true,
     playground: "https://sinkaroid.github.io/lustpress",
-    endpoint: "https://github.com/sinkaroid/lustpress/blob/master/README.md#routing",
+    endpoint:
+      "https://github.com/sinkaroid/lustpress/blob/master/README.md#routing",
     date: new Date().toLocaleString(),
     rss: lust.currentProccess().rss,
     heap: lust.currentProccess().heap,
     server: await lust.getServer(),
-    version: `${pkg.version}`,
-  });
-  logger.info({
-    path: req.path,
-    method: req.method,
-    ip: req.ip,
-    useragent: req.get("User-Agent")
-  });
-});
+    version: pkg.version,
+  }))
+  .use(scrapeRoutes)
+  .onError(({ code, error, set }) => {
+    console.log("Error occurred:", error);
+    if (code === "NOT_FOUND") {
+      set.status = 404;
+      return {
+        success: false,
+        message: (error as Error).message || "Not Found",
+      };
+    }
+    set.status = 500;
+    return {
+      success: false,
+      message: (error as Error).message || "Internal Server Error",
+      stack: (error as Error).stack,
+    };
+  })
+  .listen(process.env.PORT || 3000);
 
-app.use(scrapeRoutes());
-app.use((req: Request, res: Response, next: NextFunction) => {
-  res.status(404);
-  next(Error(`The page not found in path ${req.url} and method ${req.method}`));
-  logger.error({
-    path: req.url,
-    method: req.method,
-    ip: req.ip,
-    useragent: req.get("User-Agent")
-  });
-});
+console.log(
+  `Lustpress is running at ${app.server?.hostname}:${app.server?.port}`
+);
 
-app.use((error: any, res: Response) => {
-  res.status(500).json({
-    message: error.message,
-    stack: error.stack
-  });
-});
-
-app.listen(process.env.PORT || 3000, () => console.log(`${pkg.name} is running on port ${process.env.PORT || 3000}`));
+export type App = typeof app;

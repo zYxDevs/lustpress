@@ -1,8 +1,6 @@
 import { load } from "cheerio";
-import LustPress from "../../LustPress";
-import { IVideoData } from "../../interfaces";
-
-const lust = new LustPress();
+import { lust } from "../../LustPress";
+import { IVideoData, XhamsterInitials } from "../../interfaces";
 
 export async function scrapeContent(url: string) {
   try {
@@ -10,11 +8,11 @@ export async function scrapeContent(url: string) {
     const $ = load(buffer.toString("utf8"));
 
     const raw = $("#initials-script").html();
-    const initials = raw
+    const initials = (raw
       ? JSON.parse(
         raw.replace(/^window\.initials\s*=\s*/, "").replace(/;$/, ""),
       )
-      : null;
+      : null) as XhamsterInitials | null;
 
     class Xhamster {
       link: string;
@@ -71,13 +69,13 @@ export async function scrapeContent(url: string) {
 
         this.tags =
           initials?.videoTagsComponent?.tags
-            ?.filter((t: any) => t.isTag)
-            .map((t: any) => t.name) || [];
+            ?.filter((t) => t.isTag)
+            .map((t) => t.name) || [];
 
         this.models =
           initials?.videoTagsComponent?.tags
-            ?.filter((t: any) => t.isPornstar)
-            .map((t: any) => t.name) || [];
+            ?.filter((t) => t.isPornstar)
+            .map((t) => t.name) || [];
 
         const embedId = this.link.split("-").pop()?.replace("/", "");
         this.video = embedId ? `https://xhamster.com/embed/${embedId}` : "None";
@@ -109,3 +107,4 @@ export async function scrapeContent(url: string) {
     throw new Error(e.message);
   }
 }
+

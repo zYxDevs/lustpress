@@ -19,7 +19,7 @@ export function maybeError(success: boolean, message: string) {
 
 export function timeAgo(input: Date) {
   const date = new Date(input);
-  const formatter: any = new Intl.RelativeTimeFormat("en");
+  const formatter = new Intl.RelativeTimeFormat("en");
   const ranges: { [key: string]: number } = {
     years: 3600 * 24 * 365,
     months: 3600 * 24 * 30,
@@ -33,7 +33,7 @@ export function timeAgo(input: Date) {
   for (const key in ranges) {
     if (ranges[key] < Math.abs(secondsElapsed)) {
       const delta = secondsElapsed / ranges[key];
-      return formatter.format(Math.round(delta), key);
+      return formatter.format(Math.round(delta), key as Intl.RelativeTimeFormatUnit);
     }
   }
 }

@@ -1,8 +1,6 @@
 import { load } from "cheerio";
-import LustPress from "../../LustPress";
+import { lust } from "../../LustPress";
 import { IVideoData } from "../../interfaces";
-
-const lust = new LustPress();
 
 function calculateRatingFromStrings(
   upVote: string,

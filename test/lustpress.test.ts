@@ -1,6 +1,5 @@
-import test from "node:test";
+import { test } from "bun:test";
 import assert from "node:assert/strict";
-import p from "phin";
 
 const port = process.env.PORT ?? 3000;
 
@@ -12,15 +11,11 @@ type ApiResponse = {
 };
 
 async function run(path: string) {
-  const res = await p({
-    url: `http://localhost:${port}${path}`,
-    parse: "json",
-    timeout: 20000
-  });
+  const res = await fetch(`http://localhost:${port}${path}`);
 
-  assert.equal(res.statusCode, 200);
+  assert.equal(res.status, 200);
 
-  const json = res.body as ApiResponse;
+  const json = (await res.json()) as ApiResponse;
 
   console.log(JSON.stringify(json, null, 2));
 
@@ -31,32 +26,32 @@ async function run(path: string) {
 
 test("pornhub", async () => {
   await run("/pornhub/random");
-});
+}, 300000);
 
 test("xnxx", async () => {
   await run("/xnxx/random");
-});
+}, 120000);
 
 test("redtube", async () => {
   await run("/redtube/random");
-});
+}, 120000);
 
 test("xvideos", async () => {
   await run("/xvideos/random");
-});
+}, 120000);
 
 test("xhamster", async () => {
   await run("/xhamster/random");
-});
+}, 120000);
 
 test("youporn", async () => {
   await run("/youporn/random");
-});
+}, 120000);
 
 test("eporner", async () => {
   await run("/eporner/random");
-});
+}, 120000);
 
 test("txxx", async () => {
   await run("/txxx/random");
-});
+}, 120000);

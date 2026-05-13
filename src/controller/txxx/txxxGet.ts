@@ -1,10 +1,5 @@
-import { Request, Response } from "express";
-import LustPress from "../../LustPress";
-import { maybeError } from "../../utils/modifier";
-import { logger } from "../../utils/logger";
-import { IVideoData } from "../../interfaces";
-
-const lust = new LustPress();
+import { lust } from "../../LustPress";
+import { IVideoData, TxxxResponse } from "../../interfaces";
 
 // Generate sharded API URL exactly like TXXX expects
 function getApiUrl(videoId: string): string {
@@ -17,15 +12,13 @@ function getApiUrl(videoId: string): string {
   return `https://txxx.com/api/json/video/86400/${million}/${thousand}/${id}.json`;
 }
 
-export async function getTxxx(req: Request, res: Response) {
+export async function getTxxx({ query }: { query: { id: string } }) {
   try {
-    const id = String(req.query.id || "").trim();
-    if (!id) throw new Error("Parameter id is required");
-
+    const { id } = query;
     const apiUrl = getApiUrl(id);
 
     const buffer = await lust.fetchBody(apiUrl);
-    const parsed = JSON.parse(buffer.toString("utf-8"));
+    const parsed = JSON.parse(buffer.toString("utf-8")) as TxxxResponse;
 
     if (!parsed?.video) {
       throw new Error("Invalid API response");
@@ -34,12 +27,12 @@ export async function getTxxx(req: Request, res: Response) {
     const video = parsed.video;
 
     const categories = Object.values(video.categories || {}).map(
-      (c: any) => c.title,
+      (c) => c.title
     );
 
-    const tags = Object.values(video.tags || {}).map((t: any) => t.title);
+    const tags = Object.values(video.tags || {}).map((t) => t.title);
 
-    const models = Object.values(video.models || {}).map((m: any) => m.title);
+    const models = Object.values(video.models || {}).map((m) => m.title);
 
     const videoDir = video.dir || "";
     const videoId = video.video_id;
@@ -63,20 +56,14 @@ export async function getTxxx(req: Request, res: Response) {
         tags: [...categories, ...tags],
       },
       source: `https://txxx.com/videos/${videoId}/${videoDir}/`,
-      assets: [embed, video.thumbsrc].filter(Boolean),
+      assets: [embed, video.thumbsrc].filter(Boolean) as string[],
     };
 
-    logger.info({
-      path: req.path,
-      query: req.query,
-      method: req.method,
-      ip: req.ip,
-      useragent: req.get("User-Agent"),
-    });
-
-    return res.json(response);
+    return response;
   } catch (err) {
     const e = err as Error;
-    return res.status(400).json(maybeError(false, e.message));
+    throw new Error(e.message);
   }
 }
+
+

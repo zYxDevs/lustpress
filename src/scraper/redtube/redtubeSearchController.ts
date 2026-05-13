@@ -1,9 +1,7 @@
 import { load } from "cheerio";
-import LustPress from "../../LustPress";
+import { lust } from "../../LustPress";
 import c from "../../utils/options";
-import { ISearchVideoData } from "../../interfaces";
-
-const lust = new LustPress();
+import { ISearchVideoData, RedTubeSearchItem } from "../../interfaces";
 
 export async function scrapeContent(url: string) {
   try {
@@ -12,20 +10,19 @@ export async function scrapeContent(url: string) {
 
     class RedTubeSearch {
       views: string[];
-      search: object[];
-      data: object;
+      search: RedTubeSearchItem[];
+      data: RedTubeSearchItem[];
       constructor() {
         this.views = $("span.video_count")
           .map((i, el) => {
-            const views = $(el).text();
-            return views;
+            return $(el).text();
           }).get();
         this.search = $("a.video_link")
           .map((i, el) => {
-            const link = $(el).attr("href");
-            const id = link?.split("/")[1];
-            const title = $(el).find("img").attr("alt");
-            const image = $(el).find("img").attr("data-src");
+            const link = $(el).attr("href") || "";
+            const id = link.split("/")[1] || "None";
+            const title = $(el).find("img").attr("alt") || "None";
+            const image = $(el).find("img").attr("data-src") || "None";
             const duration = $(el).find("span.duration").text().split(" ").map((el: string) => {
               return el.replace(/[^0-9:]/g, "");
             }).filter((el: string) => {
@@ -38,35 +35,29 @@ export async function scrapeContent(url: string) {
               title: title,
               image: image,
               duration: duration,
-              views: this.views[i],
+              views: this.views[i] || "None",
               video: `https://embed.redtube.com/?id=${id}`,
-                
             };
           }).get();
-            
 
-          
-
-        this.data = this.search.filter((el: any) => {
+        this.data = this.search.filter((el) => {
           return el.link.includes("javascript:void(0)") === false && el.image?.startsWith("data:image") === false;
         });
       }
-
     }
-    
+
     const red = new RedTubeSearch();
 
     if (red.search.length === 0) throw Error("No result found");
-    const data = red.data as string[];
     const result: ISearchVideoData = {
       success: true,
-      data: data,
+      data: red.data as unknown as string[],
       source: url,
     };
     return result;
-   
+
   } catch (err) {
     const e = err as Error;
     throw Error(e.message);
   }
-}
+}
