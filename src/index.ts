@@ -30,7 +30,6 @@ const app = new Elysia()
     server: await lust.getServer(),
     version: pkg.version,
   }))
-  .use(scrapeRoutes)
   .onError(({ code, error, set }) => {
     if (code === "NOT_FOUND") {
       set.status = 404;
@@ -60,6 +59,7 @@ const app = new Elysia()
       stack: (error as Error).stack,
     };
   })
+  .use(scrapeRoutes)
   .listen(process.env.PORT || 3000);
 
 console.log(
